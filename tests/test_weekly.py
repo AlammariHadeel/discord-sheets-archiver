@@ -16,3 +16,21 @@ class WeeklyTests(unittest.TestCase):
   self.assertEqual(''.join(parts),'a'*5000+'b'*3000)
  def test_snowflake_order(self):
   self.assertLess(int(snowflake(datetime(2026,10,30,tzinfo=timezone.utc))),int(snowflake(datetime(2026,11,6,tzinfo=timezone.utc))))
+
+class URLTests(unittest.TestCase):
+ def test_markdown_urls(self):
+  from weekly_summary import extract_urls
+  self.assertEqual(extract_urls('[x](https://example.com/a_(b)) https://example.com/a_(b)'),['https://example.com/a_(b)'])
+ def test_retrieval_requires_matching_success(self):
+  from weekly_summary import retrieved
+  c={'urlContextMetadata':{'urlMetadata':[{'retrievedUrl':'https://example.com','urlRetrievalStatus':'URL_RETRIEVAL_STATUS_SUCCESS'}]}}
+  self.assertTrue(retrieved(c,'https://example.com/'))
+  self.assertFalse(retrieved(c,'https://other.example'))
+  self.assertFalse(retrieved({},'https://example.com'))
+ def test_unretrieved_content_is_discarded(self):
+  from unittest.mock import patch,Mock
+  from weekly_summary import generate
+  response=Mock(status_code=200)
+  response.json.return_value={'candidates':[{'finishReason':'STOP','content':{'parts':[{'text':'invented page content'}]}}]}
+  with patch.dict('os.environ',{'GEMINI_API_KEY':'test'}),patch('weekly_summary.requests.post',return_value=response):
+   self.assertNotIn('invented',generate('read','https://example.com'))
