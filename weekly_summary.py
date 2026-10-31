@@ -46,7 +46,7 @@ def recent(discord, channel, start, end):
 
 
 def generate(text):
-    model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    model = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
     body = {
         'systemInstruction': {'parts': [{'text':
             'Summarize the supplied Discord messages in concise Arabic bullet points. '
