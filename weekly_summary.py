@@ -12,6 +12,7 @@ import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from archive import Discord, ArchiveError, retry
+from social_content import read_social
 
 UTC = timezone.utc
 RIYADH = timezone(timedelta(hours=3))
@@ -147,7 +148,13 @@ def build_report(discord, channels, start, end):
         sections.extend(generate(batch) for batch in batches)
         for url in dict.fromkeys(source_urls):
             if url not in url_cache:
-                url_cache[url] = generate('Read and summarize this exact URL: ' + url, url=url)
+                social = read_social(url)
+                if social:
+                    label, text = social
+                    url_cache[url] = ('المصدر: ' + label + '؛ لم تُحلّل الصور أو الفيديو.\n' +
+                                      generate(json.dumps({'post_text': text}, ensure_ascii=False)))
+                else:
+                    url_cache[url] = generate('Read and summarize this exact URL: ' + url, url=url)
             sections.append('محتوى الرابط: <' + url + '>\n' + url_cache[url])
         sections.append('الروابط ومصادر الرسائل:\n' + '\n'.join('<' + u + '>' for u in dict.fromkeys(links)))
     if len(sections) == 1:
@@ -178,9 +185,9 @@ def main():
     row = rows[index] if index < len(rows) else []
     if len(row) > 2 and row[2] == 'sent':
         print('Weekly digest already delivered.'); return
-    report = row[1] if len(row) > 3 and row[3] == 'url-context-v1' else build_report(discord, list(dict.fromkeys(os.environ['CHANNEL_IDS'].split(','))), start, end)
+    report = row[1] if len(row) > 3 and row[3] == 'social-text-v2' else build_report(discord, list(dict.fromkeys(os.environ['CHANNEL_IDS'].split(','))), start, end)
     def save(status):
-        retry(lambda: api.values().update(spreadsheetId=sheet, range=f'weekly_summary!A{index+1}:D{index+1}', valueInputOption='RAW', body={'values': [[key, report, status, 'url-context-v1']]}).execute())
+        retry(lambda: api.values().update(spreadsheetId=sheet, range=f'weekly_summary!A{index+1}:D{index+1}', valueInputOption='RAW', body={'values': [[key, report, status, 'social-text-v2']]}).execute())
     save('prepared')
     if os.environ.get('DRY_RUN', 'false').lower() == 'true':
         print('Preview generated and saved in weekly_summary; no Discord message sent.'); return
